@@ -9,29 +9,50 @@ import plotly.graph_objects as go
 # =========================================================
 
 st.set_page_config(
-    page_title="SugarSense - Diabetes Prediction",
-    page_icon="🏥",
+    page_title="SugarSense - Diabetes Screening",
+    page_icon="🩺",
     layout="wide"
 )
 
 
 # =========================================================
-# CUSTOM CSS
+# LOAD SAVED FILES
+# =========================================================
+
+@st.cache_resource
+def load_files():
+
+    model = joblib.load("Diabetes_Disease_prediction.pkl")
+    scaler = joblib.load("scaler.pkl")
+    columns = joblib.load("columns.pkl")
+
+    return model, scaler, columns
+
+
+try:
+
+    model, scaler, columns = load_files()
+
+except Exception as e:
+
+    st.error("❌ Unable to load the model files.")
+    st.write(e)
+    st.stop()
+
+
+# =========================================================
+# PAGE STYLE
 # =========================================================
 
 st.markdown("""
 <style>
 
 .main {
-    padding: 0rem 1rem;
+    padding: 1rem 2rem;
 }
 
 h1 {
-    color: #1f77b4;
-}
-
-.stAlert {
-    border-radius: 10px;
+    color: #2c3e50;
 }
 
 </style>
@@ -39,84 +60,13 @@ h1 {
 
 
 # =========================================================
-# LOAD MODEL, SCALER AND COLUMNS
-# =========================================================
-
-@st.cache_resource
-def load_model():
-
-    try:
-
-        model = joblib.load(
-            "Diabetes_Disease_prediction.pkl"
-        )
-
-        scaler = joblib.load(
-            "scaler.pkl"
-        )
-
-        columns = joblib.load(
-            "columns.pkl"
-        )
-
-        return model, scaler, columns
-
-    except FileNotFoundError:
-
-        return None, None, None
-
-
-model, scaler, columns = load_model()
-
-
-# =========================================================
-# CHECK MODEL FILES
-# =========================================================
-
-if model is None:
-
-    st.error("❌ Model files not found!")
-
-    st.info("""
-    Make sure these files are in the same folder as app.py:
-
-    1. Diabetes_Disease_prediction.pkl
-    2. scaler.pkl
-    3. columns.pkl
-    """)
-
-    st.stop()
-
-
-# =========================================================
-# CHECK FEATURES
-# =========================================================
-
-if len(columns) != 11:
-
-    st.error(
-        f"❌ Feature mismatch detected! "
-        f"Your saved columns.pkl contains {len(columns)} features."
-    )
-
-    st.warning("""
-    Your model should use 11 features:
-
-    8 original features +
-    3 engineered features
-    """)
-
-    st.stop()
-
-
-# =========================================================
 # HEADER
 # =========================================================
 
-st.title("🏥 SugarSense")
+st.title("🩺 SugarSense")
 
-st.markdown(
-    "### AI-Powered Early Diabetes Risk Prediction and Screening Tool"
+st.subheader(
+    "AI-Powered Early Diabetes Risk Prediction and Screening Tool"
 )
 
 st.info(
@@ -129,14 +79,10 @@ st.info(
 # SIDEBAR
 # =========================================================
 
-st.sidebar.title("⚙️ Patient Information")
+st.sidebar.header("👤 Patient Information")
 
 st.sidebar.subheader("Clinical Measurements")
 
-
-# ---------------------------------------------------------
-# 1. Pregnancies
-# ---------------------------------------------------------
 
 pregnancies = st.sidebar.number_input(
     "Pregnancies",
@@ -147,10 +93,6 @@ pregnancies = st.sidebar.number_input(
 )
 
 
-# ---------------------------------------------------------
-# 2. Glucose
-# ---------------------------------------------------------
-
 glucose = st.sidebar.number_input(
     "Glucose (mg/dL)",
     min_value=0.0,
@@ -160,11 +102,7 @@ glucose = st.sidebar.number_input(
 )
 
 
-# ---------------------------------------------------------
-# 3. Blood Pressure
-# ---------------------------------------------------------
-
-bp = st.sidebar.number_input(
+blood_pressure = st.sidebar.number_input(
     "Blood Pressure (mm Hg)",
     min_value=0.0,
     max_value=150.0,
@@ -173,11 +111,7 @@ bp = st.sidebar.number_input(
 )
 
 
-# ---------------------------------------------------------
-# 4. Skin Thickness
-# ---------------------------------------------------------
-
-skin = st.sidebar.number_input(
+skin_thickness = st.sidebar.number_input(
     "Skin Thickness (mm)",
     min_value=0.0,
     max_value=100.0,
@@ -185,10 +119,6 @@ skin = st.sidebar.number_input(
     step=1.0
 )
 
-
-# ---------------------------------------------------------
-# 5. Insulin
-# ---------------------------------------------------------
 
 insulin = st.sidebar.number_input(
     "Insulin (μU/ml)",
@@ -199,10 +129,6 @@ insulin = st.sidebar.number_input(
 )
 
 
-# ---------------------------------------------------------
-# 6. BMI
-# ---------------------------------------------------------
-
 bmi = st.sidebar.number_input(
     "BMI",
     min_value=0.0,
@@ -212,11 +138,7 @@ bmi = st.sidebar.number_input(
 )
 
 
-# ---------------------------------------------------------
-# 7. Diabetes Pedigree Function
-# ---------------------------------------------------------
-
-dpf = st.sidebar.number_input(
+diabetes_pedigree = st.sidebar.number_input(
     "Diabetes Pedigree Function",
     min_value=0.0,
     max_value=3.0,
@@ -224,10 +146,6 @@ dpf = st.sidebar.number_input(
     step=0.01
 )
 
-
-# ---------------------------------------------------------
-# 8. Age
-# ---------------------------------------------------------
 
 age = st.sidebar.number_input(
     "Age",
@@ -238,14 +156,11 @@ age = st.sidebar.number_input(
 )
 
 
-# =========================================================
-# PREDICT BUTTON
-# =========================================================
-
 st.sidebar.markdown("---")
 
-predict_btn = st.sidebar.button(
-    "🔮 Predict Diabetes Risk",
+
+predict_button = st.sidebar.button(
+    "🔍 Predict Diabetes Risk",
     type="primary",
     use_container_width=True
 )
@@ -255,56 +170,250 @@ predict_btn = st.sidebar.button(
 # PREDICTION
 # =========================================================
 
-if predict_btn:
+if predict_button:
 
     # =====================================================
-    # FEATURE ENGINEERING
+    # ORIGINAL 8 FEATURES
     # =====================================================
 
-    # 1. Obesity flag
+    feature_values = {
 
-    obesity = int(
-        bmi >= 30
-    )
+        "Pregnancies": pregnancies,
+
+        "Glucose": glucose,
+
+        "BloodPressure": blood_pressure,
+
+        "SkinThickness": skin_thickness,
+
+        "Insulin": insulin,
+
+        "BMI": bmi,
+
+        "DiabetesPedigreeFunction": diabetes_pedigree,
+
+        "Age": age
+    }
 
 
-    # 2. Glucose × BMI interaction
+    # =====================================================
+    # ENGINEERED FEATURES
+    # =====================================================
 
+    # Obesity flag
+    obesity = int(bmi >= 30)
+
+    # Glucose × BMI
     glucose_bmi = glucose * bmi
 
-
-    # 3. Age × Glucose interaction
-
+    # Age × Glucose
     age_glucose = age * glucose
 
+    # Additional useful engineered features
+    high_glucose = int(glucose >= 126)
+
+    high_bmi = int(bmi >= 30)
+
+
+    feature_values["Obesity"] = obesity
+
+    feature_values["Glucose_BMI"] = glucose_bmi
+
+    feature_values["Age_Glucose"] = age_glucose
+
+    feature_values["High_Glucose"] = high_glucose
+
+    feature_values["High_BMI"] = high_bmi
+
 
     # =====================================================
-    # CREATE INPUT DATAFRAME
+    # CREATE INPUT USING SAVED COLUMN ORDER
     # =====================================================
 
-    input_values = [[
-        pregnancies,
-        glucose,
-        bp,
-        skin,
-        insulin,
-        bmi,
-        dpf,
-        age,
-        obesity,
-        glucose_bmi,
-        age_glucose
-    ]]
+    final_values = []
 
+    unknown_features = []
+
+
+    for column in columns:
+
+        # Exact match
+        if column in feature_values:
+
+            final_values.append(
+                feature_values[column]
+            )
+
+            continue
+
+
+        # -------------------------------------------------
+        # Handle different possible column naming styles
+        # -------------------------------------------------
+
+        normalized = (
+            str(column)
+            .lower()
+            .replace("_", "")
+            .replace(" ", "")
+            .replace("-", "")
+        )
+
+
+        if normalized in [
+            "pregnancies",
+            "pregnancy"
+        ]:
+
+            value = pregnancies
+
+
+        elif normalized == "glucose":
+
+            value = glucose
+
+
+        elif normalized in [
+            "bloodpressure",
+            "bp"
+        ]:
+
+            value = blood_pressure
+
+
+        elif normalized in [
+            "skinthickness",
+            "skin"
+        ]:
+
+            value = skin_thickness
+
+
+        elif normalized == "insulin":
+
+            value = insulin
+
+
+        elif normalized == "bmi":
+
+            value = bmi
+
+
+        elif normalized in [
+            "diabetespedigreefunction",
+            "diabetespedigree",
+            "dpf"
+        ]:
+
+            value = diabetes_pedigree
+
+
+        elif normalized == "age":
+
+            value = age
+
+
+        elif normalized in [
+            "obesity",
+            "obesityflag",
+            "isobese"
+        ]:
+
+            value = obesity
+
+
+        elif normalized in [
+            "glucosebmi",
+            "glucosebminteraction",
+            "glucosebmiproduct"
+        ]:
+
+            value = glucose_bmi
+
+
+        elif normalized in [
+            "ageglucose",
+            "ageglucoseinteraction",
+            "ageglucoseproduct"
+        ]:
+
+            value = age_glucose
+
+
+        elif normalized in [
+            "highglucose",
+            "highglucoseflag"
+        ]:
+
+            value = high_glucose
+
+
+        elif normalized in [
+            "highbmi",
+            "highbmiflag"
+        ]:
+
+            value = high_bmi
+
+
+        else:
+
+            unknown_features.append(column)
+
+            value = 0
+
+
+        final_values.append(value)
+
+
+    # =====================================================
+    # INPUT DATAFRAME
+    # =====================================================
 
     input_data = pd.DataFrame(
-        input_values,
+        [final_values],
         columns=columns
     )
 
 
     # =====================================================
-    # HANDLE ZERO VALUES
+    # CHECK FEATURE COUNT
+    # =====================================================
+
+    if len(columns) != scaler.n_features_in_:
+
+        st.error(
+            f"❌ Feature mismatch between columns.pkl "
+            f"and scaler.pkl."
+        )
+
+        st.write(
+            f"columns.pkl: {len(columns)} features"
+        )
+
+        st.write(
+            f"scaler.pkl: {scaler.n_features_in_} features"
+        )
+
+        st.stop()
+
+
+    # =====================================================
+    # CHECK UNKNOWN FEATURES
+    # =====================================================
+
+    if unknown_features:
+
+        st.warning(
+            "⚠️ Additional saved features detected: "
+            + ", ".join(
+                map(str, unknown_features)
+            )
+        )
+
+
+    # =====================================================
+    # CHECK ZERO VALUES
     # =====================================================
 
     missing_columns = [
@@ -316,71 +425,101 @@ if predict_btn:
     ]
 
 
+    missing_input = False
+
+
     for col in missing_columns:
 
-        if input_data[col].iloc[0] == 0:
+        if col in input_data.columns:
 
-            input_data[col] = pd.NA
+            if input_data[col].iloc[0] == 0:
+
+                missing_input = True
 
 
-    # =====================================================
-    # CHECK FOR MISSING VALUES
-    # =====================================================
-
-    if input_data.isna().any().any():
+    if missing_input:
 
         st.warning(
-            "⚠️ Some measurements are zero/missing. "
-            "Your current saved scaler/model does not contain "
-            "an imputer, so please enter valid clinical values."
+            "⚠️ Some clinical measurements are zero. "
+            "Please enter valid values before prediction."
         )
 
         st.stop()
 
 
     # =====================================================
-    # SCALE INPUT
-    # =====================================================
-
-    input_scaled = scaler.transform(
-        input_data
-    )
-
-
-    # =====================================================
-    # MODEL PREDICTION
-    # =====================================================
-
-    prediction = model.predict(
-        input_scaled
-    )[0]
-
-
-    # =====================================================
-    # PREDICTION PROBABILITY
+    # SCALE
     # =====================================================
 
     try:
+
+        input_scaled = scaler.transform(
+            input_data
+        )
+
+    except Exception as e:
+
+        st.error(
+            "❌ Error while processing the input."
+        )
+
+        st.code(str(e))
+
+        st.stop()
+
+
+    # =====================================================
+    # PREDICTION
+    # =====================================================
+
+    try:
+
+        prediction = model.predict(
+            input_scaled
+        )[0]
+
 
         probability = model.predict_proba(
             input_scaled
         )[0]
 
-        prob_negative = probability[0] * 100
 
-        prob_positive = probability[1] * 100
-
-    except:
-
-        prob_positive = (
-            100
-            if prediction == 1
-            else 0
+        non_diabetes_probability = (
+            probability[0] * 100
         )
 
-        prob_negative = (
-            100 - prob_positive
+
+        diabetes_probability = (
+            probability[1] * 100
         )
+
+
+    except Exception as e:
+
+        st.error(
+            "❌ Error during prediction."
+        )
+
+        st.code(str(e))
+
+        st.stop()
+
+
+    # =====================================================
+    # RISK LEVEL
+    # =====================================================
+
+    if diabetes_probability < 30:
+
+        risk_level = "LOW RISK"
+
+    elif diabetes_probability < 70:
+
+        risk_level = "MODERATE RISK"
+
+    else:
+
+        risk_level = "HIGH RISK"
 
 
     # =====================================================
@@ -392,143 +531,112 @@ if predict_btn:
     st.header("🎯 Prediction Results")
 
 
-    col1, col2 = st.columns([2, 1])
+    col1, col2, col3 = st.columns(3)
+
+
+    col1.metric(
+        "Prediction",
+        "Diabetes Risk"
+        if prediction == 1
+        else "No Diabetes Risk"
+    )
+
+
+    col2.metric(
+        "Diabetes Probability",
+        f"{diabetes_probability:.1f}%"
+    )
+
+
+    col3.metric(
+        "Risk Level",
+        risk_level
+    )
 
 
     # =====================================================
-    # PREDICTION MESSAGE
+    # RESULT MESSAGE
     # =====================================================
 
-    with col1:
+    if diabetes_probability >= 70:
 
-        if prediction == 1:
+        st.error(
+            "### 🔴 HIGH RISK"
+        )
 
-            if prob_positive >= 70:
-
-                st.error(
-                    "### 🔴 HIGH RISK - Diabetes Detected"
-                )
-
-            else:
-
-                st.warning(
-                    "### ⚠️ MODERATE RISK - Diabetes Risk"
-                )
-
-        else:
-
-            if prob_positive < 30:
-
-                st.success(
-                    "### 🟢 LOW RISK - Diabetes Not Detected"
-                )
-
-            else:
-
-                st.warning(
-                    "### ⚠️ MODERATE RISK - Please Monitor"
-                )
-
-
-        # =================================================
-        # PROBABILITY
-        # =================================================
-
-        st.subheader(
-            "Probability Breakdown"
+        st.write(
+            "The model estimates a relatively high "
+            "probability of diabetes."
         )
 
 
-        pcol1, pcol2 = st.columns(2)
+    elif diabetes_probability >= 30:
 
+        st.warning(
+            "### 🟡 MODERATE RISK"
+        )
 
-        pcol1.metric(
-            "Non-Diabetic Probability",
-            f"{prob_negative:.1f}%"
+        st.write(
+            "The model estimates an intermediate "
+            "probability of diabetes."
         )
 
 
-        pcol2.metric(
-            "Diabetic Probability",
-            f"{prob_positive:.1f}%"
+    else:
+
+        st.success(
+            "### 🟢 LOW RISK"
         )
 
-
-    # =====================================================
-    # GAUGE
-    # =====================================================
-
-    with col2:
-
-        fig = go.Figure(
-            go.Indicator(
-
-                mode="gauge+number",
-
-                value=prob_positive,
-
-                title={
-                    "text": "Diabetes Risk"
-                },
-
-                number={
-                    "suffix": "%"
-                },
-
-                gauge={
-
-                    "axis": {
-                        "range": [0, 100]
-                    },
-
-                    "bar": {
-                        "color": "darkblue"
-                    },
-
-                    "steps": [
-
-                        {
-                            "range": [0, 30],
-                            "color": "lightgreen"
-                        },
-
-                        {
-                            "range": [30, 70],
-                            "color": "yellow"
-                        },
-
-                        {
-                            "range": [70, 100],
-                            "color": "red"
-                        }
-
-                    ]
-                }
-            )
-        )
-
-
-        fig.update_layout(
-
-            height=300,
-
-            margin=dict(
-                l=20,
-                r=20,
-                t=50,
-                b=20
-            )
-        )
-
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True
+        st.write(
+            "The model estimates a relatively low "
+            "probability of diabetes."
         )
 
 
     # =====================================================
-    # RISK FACTOR ANALYSIS
+    # PROBABILITY BREAKDOWN
+    # =====================================================
+
+    st.subheader(
+        "📊 Probability Breakdown"
+    )
+
+
+    pcol1, pcol2 = st.columns(2)
+
+
+    pcol1.metric(
+        "Non-Diabetic",
+        f"{non_diabetes_probability:.1f}%"
+    )
+
+
+    pcol2.metric(
+        "Diabetes",
+        f"{diabetes_probability:.1f}%"
+    )
+
+
+    # =====================================================
+    # PROGRESS BAR
+    # =====================================================
+
+    st.subheader(
+        "📈 Diabetes Risk"
+    )
+
+
+    st.progress(
+        min(
+            int(diabetes_probability),
+            100
+        )
+    )
+
+
+    # =====================================================
+    # RISK FACTORS
     # =====================================================
 
     st.markdown("---")
@@ -540,97 +648,57 @@ if predict_btn:
 
     risk_factors = []
 
-    positive_factors = []
-
-
-    # -----------------------------------------------------
-    # Glucose
-    # -----------------------------------------------------
 
     if glucose >= 126:
 
         risk_factors.append(
-            "🔴 High Glucose level (≥126 mg/dL)"
+            f"🔴 High glucose: {glucose:.0f} mg/dL"
         )
 
     elif glucose >= 100:
 
         risk_factors.append(
-            "🟡 Elevated Glucose level"
-        )
-
-    else:
-
-        positive_factors.append(
-            "🟢 Glucose level is below the elevated range"
+            f"🟡 Elevated glucose: {glucose:.0f} mg/dL"
         )
 
 
-    # -----------------------------------------------------
-    # Blood Pressure
-    # -----------------------------------------------------
-
-    if bp > 80:
+    if blood_pressure > 80:
 
         risk_factors.append(
-            "🔴 High Blood Pressure (>80 mm Hg)"
+            f"🟡 Elevated blood pressure: "
+            f"{blood_pressure:.0f} mm Hg"
         )
 
-    else:
-
-        positive_factors.append(
-            "🟢 Blood Pressure is not above 80 mm Hg"
-        )
-
-
-    # -----------------------------------------------------
-    # BMI
-    # -----------------------------------------------------
 
     if bmi >= 30:
 
         risk_factors.append(
-            "🔴 BMI indicates obesity (≥30)"
+            f"🔴 BMI indicates obesity: {bmi:.1f}"
         )
 
-    elif 18.5 <= bmi < 25:
+    elif bmi >= 25:
 
-        positive_factors.append(
-            "🟢 BMI is in the healthy range"
+        risk_factors.append(
+            f"🟡 BMI is in overweight range: {bmi:.1f}"
         )
 
-
-    # -----------------------------------------------------
-    # Age
-    # -----------------------------------------------------
 
     if age > 45:
 
         risk_factors.append(
-            "🟡 Age-related risk factor (>45)"
+            f"🟡 Age-related risk factor: {age} years"
         )
 
-
-    # -----------------------------------------------------
-    # Pregnancies
-    # -----------------------------------------------------
 
     if pregnancies >= 6:
 
         risk_factors.append(
-            "🟡 Higher number of pregnancies"
+            f"🟡 Higher number of pregnancies: "
+            f"{pregnancies}"
         )
 
-
-    # =====================================================
-    # DISPLAY RISK FACTORS
-    # =====================================================
 
     if risk_factors:
-
-        st.warning(
-            "**Identified Risk Factors:**"
-        )
 
         for factor in risk_factors:
 
@@ -638,60 +706,16 @@ if predict_btn:
                 f"- {factor}"
             )
 
-
-    # =====================================================
-    # DISPLAY POSITIVE FACTORS
-    # =====================================================
-
-    if positive_factors:
-
-        st.success(
-            "**Positive Indicators:**"
-        )
-
-        for factor in positive_factors:
-
-            st.markdown(
-                f"- {factor}"
-            )
-
-
-    # =====================================================
-    # RECOMMENDATIONS
-    # =====================================================
-
-    st.markdown("---")
-
-    st.subheader(
-        "💡 Recommendations"
-    )
-
-
-    if prediction == 1:
-
-        st.error("""
-**Recommended Actions:**
-
-- Consult a qualified healthcare professional.
-- Consider appropriate diabetes screening.
-- Monitor blood glucose regularly.
-- Maintain a balanced diet and healthy lifestyle.
-        """)
-
     else:
 
-        st.success("""
-**Maintain Healthy Practices:**
-
-- Continue regular health check-ups.
-- Maintain a balanced diet.
-- Exercise regularly.
-- Maintain a healthy body weight.
-        """)
+        st.success(
+            "No major risk factors identified "
+            "from the entered measurements."
+        )
 
 
     # =====================================================
-    # INPUT SUMMARY
+    # PATIENT SUMMARY
     # =====================================================
 
     st.markdown("---")
@@ -701,24 +725,17 @@ if predict_btn:
     )
 
 
-    summary_data = pd.DataFrame({
+    summary = pd.DataFrame({
 
         "Measurement": [
 
             "Pregnancies",
-
             "Glucose",
-
             "Blood Pressure",
-
             "Skin Thickness",
-
             "Insulin",
-
             "BMI",
-
             "Diabetes Pedigree Function",
-
             "Age"
 
         ],
@@ -726,19 +743,12 @@ if predict_btn:
         "Value": [
 
             pregnancies,
-
             glucose,
-
-            bp,
-
-            skin,
-
+            blood_pressure,
+            skin_thickness,
             insulin,
-
             bmi,
-
-            dpf,
-
+            diabetes_pedigree,
             age
 
         ]
@@ -747,10 +757,52 @@ if predict_btn:
 
 
     st.dataframe(
-        summary_data,
+        summary,
         use_container_width=True,
         hide_index=True
     )
+
+
+    # =====================================================
+    # MODEL INFORMATION
+    # =====================================================
+
+    st.markdown("---")
+
+    st.subheader(
+        "🤖 Model Information"
+    )
+
+
+    mcol1, mcol2 = st.columns(2)
+
+
+    mcol1.metric(
+        "Features Used",
+        len(columns)
+    )
+
+
+    mcol2.metric(
+        "Model",
+        type(model).__name__
+    )
+
+
+    # =====================================================
+    # MEDICAL DISCLAIMER
+    # =====================================================
+
+    st.markdown("---")
+
+    st.warning("""
+⚠️ **Medical Disclaimer**
+
+This application is intended for educational and screening
+purposes only. It is NOT a medical diagnosis and should not
+replace examination, laboratory testing, or advice from a
+qualified healthcare professional.
+""")
 
 
 # =========================================================
@@ -761,36 +813,10 @@ else:
 
     st.markdown("---")
 
-
     st.info(
         "👈 Enter patient information in the sidebar "
         "and click **Predict Diabetes Risk**."
     )
-
-
-    col1, col2, col3 = st.columns(3)
-
-
-    col1.metric(
-        "Model",
-        "Logistic Regression",
-        "Accuracy: 77.2%"
-    )
-
-
-    col2.metric(
-        "Features",
-        "11"
-    )
-
-
-    col3.metric(
-        "Dataset",
-        "768 Samples"
-    )
-
-
-    st.markdown("---")
 
 
     st.subheader(
@@ -799,19 +825,41 @@ else:
 
 
     st.write("""
-    SugarSense is an educational machine-learning application
-    designed for early diabetes risk screening.
+SugarSense is an educational machine-learning application
+for early diabetes risk screening.
 
-    The model uses clinical measurements such as glucose,
-    blood pressure, BMI, age and other patient information
-    to estimate diabetes risk.
-    """)
+The application uses clinical measurements including glucose,
+blood pressure, BMI, age, insulin and other patient information
+to estimate diabetes risk.
+""")
+
+
+    st.markdown("---")
+
+
+    st.subheader(
+        "📊 Saved Model Information"
+    )
+
+
+    c1, c2 = st.columns(2)
+
+
+    c1.metric(
+        "Saved Features",
+        len(columns)
+    )
+
+
+    c2.metric(
+        "Model",
+        type(model).__name__
+    )
 
 
     st.warning("""
-    ⚠️ **Medical Disclaimer**
+⚠️ **Medical Disclaimer**
 
-    This application is for educational and screening purposes only.
-    It is NOT a medical diagnosis and should not replace advice,
-    examination or testing by a qualified healthcare professional.
-    """)
+This application is for educational and screening purposes only.
+It is NOT a medical diagnosis.
+""")
