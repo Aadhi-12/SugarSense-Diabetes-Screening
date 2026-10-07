@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import joblib
 
+
 # =========================================================
 # LOAD MODEL, SCALER AND COLUMNS
 # =========================================================
@@ -20,29 +21,6 @@ st.set_page_config(
     page_icon="🩺",
     layout="wide"
 )
-
-
-# =========================================================
-# CUSTOM STYLE
-# =========================================================
-
-st.markdown("""
-<style>
-
-.main {
-    padding: 1rem 2rem;
-}
-
-h1 {
-    color: #2c3e50;
-}
-
-.stAlert {
-    border-radius: 10px;
-}
-
-</style>
-""", unsafe_allow_html=True)
 
 
 # =========================================================
@@ -77,7 +55,6 @@ pregnancies = st.sidebar.number_input(
     step=1
 )
 
-
 glucose = st.sidebar.number_input(
     "Glucose (mg/dL)",
     min_value=0.0,
@@ -85,7 +62,6 @@ glucose = st.sidebar.number_input(
     value=120.0,
     step=1.0
 )
-
 
 blood_pressure = st.sidebar.number_input(
     "Blood Pressure (mm Hg)",
@@ -95,7 +71,6 @@ blood_pressure = st.sidebar.number_input(
     step=1.0
 )
 
-
 skin_thickness = st.sidebar.number_input(
     "Skin Thickness (mm)",
     min_value=0.0,
@@ -103,7 +78,6 @@ skin_thickness = st.sidebar.number_input(
     value=20.0,
     step=1.0
 )
-
 
 insulin = st.sidebar.number_input(
     "Insulin (μU/ml)",
@@ -113,7 +87,6 @@ insulin = st.sidebar.number_input(
     step=1.0
 )
 
-
 bmi = st.sidebar.number_input(
     "BMI",
     min_value=0.0,
@@ -122,7 +95,6 @@ bmi = st.sidebar.number_input(
     step=0.1
 )
 
-
 diabetes_pedigree = st.sidebar.number_input(
     "Diabetes Pedigree Function",
     min_value=0.0,
@@ -130,7 +102,6 @@ diabetes_pedigree = st.sidebar.number_input(
     value=0.47,
     step=0.01
 )
-
 
 age = st.sidebar.number_input(
     "Age",
@@ -161,45 +132,44 @@ if predict_button:
     # ORIGINAL 8 FEATURES
     # =====================================================
 
-    input_data = pd.DataFrame([[
-        pregnancies,
-        glucose,
-        blood_pressure,
-        skin_thickness,
-        insulin,
-        bmi,
-        diabetes_pedigree,
-        age
-    ]], columns=[
-        "Pregnancies",
-        "Glucose",
-        "BloodPressure",
-        "SkinThickness",
-        "Insulin",
-        "BMI",
-        "DiabetesPedigreeFunction",
-        "Age"
-    ])
+    input_data = pd.DataFrame(
+        [[
+            pregnancies,
+            glucose,
+            blood_pressure,
+            skin_thickness,
+            insulin,
+            bmi,
+            diabetes_pedigree,
+            age
+        ]],
+        columns=[
+            "Pregnancies",
+            "Glucose",
+            "BloodPressure",
+            "SkinThickness",
+            "Insulin",
+            "BMI",
+            "DiabetesPedigreeFunction",
+            "Age"
+        ]
+    )
 
 
     # =====================================================
     # FEATURE ENGINEERING
-    # Same structure used during model training
     # =====================================================
 
-    # 1. Obesity Flag
     input_data["ObesityFlag"] = (
         input_data["BMI"] >= 30
     ).astype(int)
 
 
-    # 2. High Glucose Flag
     input_data["HighGlucoseFlag"] = (
         input_data["Glucose"] >= 140
     ).astype(int)
 
 
-    # 3. Age Group
     input_data["AgeGroup"] = pd.cut(
         input_data["Age"],
         bins=[0, 30, 45, 60, 120],
@@ -212,7 +182,6 @@ if predict_button:
     )
 
 
-    # 4. BMI Category
     input_data["BMI_Category"] = pd.cut(
         input_data["BMI"],
         bins=[0, 18.5, 25, 30, 100],
@@ -225,14 +194,14 @@ if predict_button:
     )
 
 
-    # 5. Glucose Category
     input_data["GlucoseCategory"] = pd.cut(
         input_data["Glucose"],
-        bins=[0, 100, 126, 200],
+        bins=[0, 100, 126, 200, 1000],
         labels=[
             "Normal",
             "Prediabetes",
-            "High"
+            "High",
+            "Very_High"
         ]
     )
 
@@ -266,8 +235,11 @@ if predict_button:
     # SCALE
     # =====================================================
 
+    # Convert to NumPy array so sklearn does not reject
+    # the feature names stored inside scaler.pkl.
+
     input_scaled = scaler.transform(
-        input_encoded
+        input_encoded.to_numpy()
     )
 
 
@@ -296,17 +268,14 @@ if predict_button:
     if diabetes_probability < 30:
 
         risk_level = "LOW RISK"
-        risk_icon = "🟢"
 
     elif diabetes_probability < 70:
 
         risk_level = "MODERATE RISK"
-        risk_icon = "🟡"
 
     else:
 
         risk_level = "HIGH RISK"
-        risk_icon = "🔴"
 
 
     # =====================================================
@@ -323,13 +292,13 @@ if predict_button:
         if diabetes_probability >= 70:
 
             st.error(
-                f"### 🔴 HIGH RISK - Higher Diabetes Risk"
+                "### 🔴 HIGH RISK - Higher Diabetes Risk"
             )
 
         else:
 
             st.warning(
-                f"### 🟡 MODERATE RISK - Diabetes Risk"
+                "### 🟡 MODERATE RISK - Diabetes Risk"
             )
 
     else:
@@ -382,7 +351,7 @@ if predict_button:
     st.subheader("📈 Diabetes Risk Level")
 
     st.progress(
-        int(diabetes_probability)
+        min(100, max(0, int(diabetes_probability)))
     )
 
     st.caption(
@@ -683,13 +652,13 @@ if predict_button:
 
     model_col3.metric(
         "Features",
-        "18"
+        str(len(columns))
     )
 
 
     st.info(
-        "The model uses the original clinical measurements "
-        "together with engineered and one-hot-encoded features."
+        "The model uses the clinical measurements together "
+        "with engineered features."
     )
 
 
@@ -742,8 +711,8 @@ if predict_button:
     with st.expander("🔬 View Feature Processing Details"):
 
         st.write(
-            "The application converts the 8 clinical inputs "
-            "into the same feature structure used by the trained model."
+            "The application converts the clinical inputs "
+            "into the feature structure expected by the trained model."
         )
 
         st.markdown("""
@@ -756,8 +725,8 @@ if predict_button:
 - GlucoseCategory
 
 The categorical features are one-hot encoded, arranged in the
-saved training-column order, scaled using the saved scaler, and
-then passed to the Random Forest model.
+saved training-column order, scaled using the saved scaler,
+and then passed to the Random Forest model.
         """)
 
 
