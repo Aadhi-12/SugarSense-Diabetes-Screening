@@ -55,6 +55,7 @@ pregnancies = st.sidebar.number_input(
     step=1
 )
 
+
 glucose = st.sidebar.number_input(
     "Glucose (mg/dL)",
     min_value=0.0,
@@ -62,6 +63,7 @@ glucose = st.sidebar.number_input(
     value=120.0,
     step=1.0
 )
+
 
 blood_pressure = st.sidebar.number_input(
     "Blood Pressure (mm Hg)",
@@ -71,6 +73,7 @@ blood_pressure = st.sidebar.number_input(
     step=1.0
 )
 
+
 skin_thickness = st.sidebar.number_input(
     "Skin Thickness (mm)",
     min_value=0.0,
@@ -78,6 +81,7 @@ skin_thickness = st.sidebar.number_input(
     value=20.0,
     step=1.0
 )
+
 
 insulin = st.sidebar.number_input(
     "Insulin (μU/ml)",
@@ -87,6 +91,7 @@ insulin = st.sidebar.number_input(
     step=1.0
 )
 
+
 bmi = st.sidebar.number_input(
     "BMI",
     min_value=0.0,
@@ -95,6 +100,7 @@ bmi = st.sidebar.number_input(
     step=0.1
 )
 
+
 diabetes_pedigree = st.sidebar.number_input(
     "Diabetes Pedigree Function",
     min_value=0.0,
@@ -102,6 +108,7 @@ diabetes_pedigree = st.sidebar.number_input(
     value=0.47,
     step=0.01
 )
+
 
 age = st.sidebar.number_input(
     "Age",
@@ -129,122 +136,41 @@ predict_button = st.sidebar.button(
 if predict_button:
 
     # =====================================================
-    # ORIGINAL 8 FEATURES
+    # INPUT DATA
     # =====================================================
 
-    input_data = pd.DataFrame(
-        [[
-            pregnancies,
-            glucose,
-            blood_pressure,
-            skin_thickness,
-            insulin,
-            bmi,
-            diabetes_pedigree,
-            age
-        ]],
-        columns=[
-            "Pregnancies",
-            "Glucose",
-            "BloodPressure",
-            "SkinThickness",
-            "Insulin",
-            "BMI",
-            "DiabetesPedigreeFunction",
-            "Age"
-        ]
-    )
+    input_data = pd.DataFrame([[
+        pregnancies,
+        glucose,
+        blood_pressure,
+        skin_thickness,
+        insulin,
+        bmi,
+        diabetes_pedigree,
+        age
+    ]], columns=[
+        "Pregnancies",
+        "Glucose",
+        "BloodPressure",
+        "SkinThickness",
+        "Insulin",
+        "BMI",
+        "DiabetesPedigreeFunction",
+        "Age"
+    ])
 
 
     # =====================================================
-    # FEATURE ENGINEERING
+    # SCALE INPUT
     # =====================================================
-
-    input_data["ObesityFlag"] = (
-        input_data["BMI"] >= 30
-    ).astype(int)
-
-
-    input_data["HighGlucoseFlag"] = (
-        input_data["Glucose"] >= 140
-    ).astype(int)
-
-
-    input_data["AgeGroup"] = pd.cut(
-        input_data["Age"],
-        bins=[0, 30, 45, 60, 120],
-        labels=[
-            "Young",
-            "Adult",
-            "Middle_Age",
-            "Senior"
-        ]
-    )
-
-
-    input_data["BMI_Category"] = pd.cut(
-        input_data["BMI"],
-        bins=[0, 18.5, 25, 30, 100],
-        labels=[
-            "Underweight",
-            "Normal",
-            "Overweight",
-            "Obese"
-        ]
-    )
-
-
-    input_data["GlucoseCategory"] = pd.cut(
-        input_data["Glucose"],
-        bins=[0, 100, 126, 200, 1000],
-        labels=[
-            "Normal",
-            "Prediabetes",
-            "High",
-            "Very_High"
-        ]
-    )
-
-
-    # =====================================================
-    # ONE-HOT ENCODING
-    # =====================================================
-
-    input_encoded = pd.get_dummies(
-        input_data,
-        columns=[
-            "AgeGroup",
-            "BMI_Category",
-            "GlucoseCategory"
-        ],
-        drop_first=True
-    )
-
-
-    # =====================================================
-    # MATCH EXACT TRAINING COLUMNS
-    # =====================================================
-
-    input_encoded = input_encoded.reindex(
-        columns=columns,
-        fill_value=0
-    )
-
-
-    # =====================================================
-    # SCALE
-    # =====================================================
-
-    # Convert to NumPy array so sklearn does not reject
-    # the feature names stored inside scaler.pkl.
 
     input_scaled = scaler.transform(
-        input_encoded.to_numpy()
+        input_data.to_numpy()
     )
 
 
     # =====================================================
-    # MODEL PREDICTION
+    # PREDICTION
     # =====================================================
 
     prediction = model.predict(
@@ -317,7 +243,7 @@ if predict_button:
 
 
     # =====================================================
-    # PROBABILITY BREAKDOWN
+    # PROBABILITY
     # =====================================================
 
     st.subheader("📊 Probability Breakdown")
@@ -345,14 +271,16 @@ if predict_button:
 
 
     # =====================================================
-    # RISK BAR
+    # PROGRESS BAR
     # =====================================================
 
     st.subheader("📈 Diabetes Risk Level")
 
+
     st.progress(
-        min(100, max(0, int(diabetes_probability)))
+        int(diabetes_probability)
     )
+
 
     st.caption(
         "0% = lower model-estimated risk | "
@@ -392,7 +320,7 @@ if predict_button:
 
 
     # =====================================================
-    # RISK FACTOR ANALYSIS
+    # RISK FACTORS
     # =====================================================
 
     st.markdown("---")
@@ -404,7 +332,6 @@ if predict_button:
     positive_factors = []
 
 
-    # Glucose
     if glucose >= 126:
 
         risk_factors.append(
@@ -424,7 +351,6 @@ if predict_button:
         )
 
 
-    # Blood Pressure
     if blood_pressure > 80:
 
         risk_factors.append(
@@ -440,7 +366,6 @@ if predict_button:
         )
 
 
-    # BMI
     if bmi >= 30:
 
         risk_factors.append(
@@ -466,7 +391,6 @@ if predict_button:
         )
 
 
-    # Age
     if age > 45:
 
         risk_factors.append(
@@ -480,17 +404,12 @@ if predict_button:
         )
 
 
-    # Pregnancies
     if pregnancies >= 6:
 
         risk_factors.append(
             f"🟡 Higher number of pregnancies: {pregnancies}"
         )
 
-
-    # =====================================================
-    # DISPLAY RISK FACTORS
-    # =====================================================
 
     if risk_factors:
 
@@ -515,7 +434,7 @@ if predict_button:
 
 
     # =====================================================
-    # CLINICAL MEASUREMENT ANALYSIS
+    # CLINICAL ANALYSIS
     # =====================================================
 
     st.markdown("---")
@@ -652,13 +571,13 @@ if predict_button:
 
     model_col3.metric(
         "Features",
-        str(len(columns))
+        "8"
     )
 
 
     st.info(
-        "The model uses the clinical measurements together "
-        "with engineered features."
+        "The model uses the original clinical measurements "
+        "for diabetes risk prediction."
     )
 
 
@@ -690,8 +609,8 @@ if predict_button:
             blood_pressure,
             skin_thickness,
             insulin,
-            bmi,
             diabetes_pedigree,
+            bmi,
             age
         ]
     })
@@ -702,32 +621,6 @@ if predict_button:
         use_container_width=True,
         hide_index=True
     )
-
-
-    # =====================================================
-    # FEATURE PROCESSING DETAILS
-    # =====================================================
-
-    with st.expander("🔬 View Feature Processing Details"):
-
-        st.write(
-            "The application converts the clinical inputs "
-            "into the feature structure expected by the trained model."
-        )
-
-        st.markdown("""
-**Engineered features:**
-
-- ObesityFlag → BMI ≥ 30
-- HighGlucoseFlag → Glucose ≥ 140 mg/dL
-- AgeGroup
-- BMI_Category
-- GlucoseCategory
-
-The categorical features are one-hot encoded, arranged in the
-saved training-column order, scaled using the saved scaler,
-and then passed to the Random Forest model.
-        """)
 
 
 # =========================================================
