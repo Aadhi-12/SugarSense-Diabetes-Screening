@@ -75,7 +75,7 @@ if st.sidebar.button("🔍 Predict Diabetes Risk"):
         "Age"
     ])
 
-    input_scaled = scaler.transform(input_data)
+    input_scaled = scaler.transform(input_data.to_numpy())
 
     prediction = model.predict(input_scaled)[0]
     probability = model.predict_proba(input_scaled)[0][1]
